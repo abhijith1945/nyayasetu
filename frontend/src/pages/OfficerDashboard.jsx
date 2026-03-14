@@ -3,6 +3,7 @@ import {
   getDashboardStats,
   getDashboardMap,
   getDashboardClusters,
+  getDashboardTrends,
   getGrievances,
   resolveGrievance,
   generateBrief,
@@ -14,8 +15,10 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorCard from '../components/ErrorCard'
 import Toast from '../components/Toast'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
+import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 const TABS = ['Dashboard', 'Complaints', 'Clusters', 'Generate Brief']
+const PIE_COLORS = ['#3B82F6', '#10B981', '#EF4444', '#F59E0B', '#8B5CF6', '#6B7280']
 
 export default function OfficerDashboard() {
   const [activeTab, setActiveTab] = useState('Dashboard')
@@ -24,6 +27,7 @@ export default function OfficerDashboard() {
   // Dashboard tab state
   const [stats, setStats] = useState(null)
   const [mapData, setMapData] = useState([])
+  const [trends, setTrends] = useState(null)
   const [statsLoading, setStatsLoading] = useState(true)
   const [statsError, setStatsError] = useState(null)
 
@@ -47,12 +51,14 @@ export default function OfficerDashboard() {
     setStatsLoading(true)
     setStatsError(null)
     try {
-      const [statsRes, mapRes] = await Promise.all([
+      const [statsRes, mapRes, trendsRes] = await Promise.all([
         getDashboardStats(),
         getDashboardMap(),
+        getDashboardTrends(),
       ])
       setStats(statsRes?.data?.data || statsRes?.data || null)
       setMapData(mapRes?.data?.data || mapRes?.data || [])
+      setTrends(trendsRes?.data?.data || trendsRes?.data || null)
     } catch (err) {
       console.error('Dashboard fetch error:', err)
       setStatsError(err?.message || 'Failed to load dashboard')
@@ -201,6 +207,49 @@ export default function OfficerDashboard() {
                   <StatCard title="Critical" value={stats?.critical ?? 0} color="border-critical" icon="🚨" />
                   <StatCard title="Active Clusters" value={stats?.clusters_active ?? 0} color="border-accent" icon="🔗" />
                 </div>
+
+                {/* Charts */}
+                {trends && (
+                  <div className="mb-8 grid gap-4 lg:grid-cols-2">
+                    {/* Category Bar Chart */}
+                    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                      <h3 className="mb-3 font-heading text-sm font-semibold text-navy">Complaints by Category</h3>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <BarChart data={trends.by_category || []}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                          <YAxis allowDecimals={false} />
+                          <Tooltip />
+                          <Bar dataKey="count" fill="#10B981" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Status Pie Chart */}
+                    <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                      <h3 className="mb-3 font-heading text-sm font-semibold text-navy">Status Distribution</h3>
+                      <ResponsiveContainer width="100%" height={250}>
+                        <PieChart>
+                          <Pie
+                            data={trends.by_status || []}
+                            dataKey="count"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={90}
+                            label={({ name, count }) => `${name} (${count})`}
+                          >
+                            {(trends.by_status || []).map((_, i) => (
+                              <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
 
                 {/* Map */}
                 <div className="mb-8 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">

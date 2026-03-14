@@ -176,3 +176,21 @@ async def confirm_resolution(grievance_id: str):
     except Exception as e:
         logger.error("Confirm resolution error: %s", str(e))
         return {"success": False, "data": None, "error": str(e)}
+
+
+@router.post("/grievances/{grievance_id}/support")
+async def support_grievance(grievance_id: str):
+    """Increment community support count for a grievance."""
+    from main import supabase
+    if not supabase:
+        return {"success": False, "data": None, "error": "Database not configured"}
+    try:
+        g_result = supabase.table("grievances").select("support_count").eq("id", grievance_id).execute()
+        if not g_result.data:
+            return {"success": False, "data": None, "error": "Grievance not found"}
+        current = g_result.data[0].get("support_count") or 0
+        supabase.table("grievances").update({"support_count": current + 1}).eq("id", grievance_id).execute()
+        return {"success": True, "data": {"support_count": current + 1}, "error": None}
+    except Exception as e:
+        logger.error("Support grievance error: %s", str(e))
+        return {"success": False, "data": None, "error": str(e)}

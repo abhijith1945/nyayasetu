@@ -17,6 +17,30 @@ const WARDS = [
   'Ward 8 (Kovalam)',
 ]
 
+const WARD_COORDS = {
+  'Ward 1 (Kazhakoottam)': [8.5667, 76.8721],
+  'Ward 2 (Technopark)': [8.5500, 76.8800],
+  'Ward 3 (Pattom)': [8.5241, 76.9366],
+  'Ward 4 (Vanchiyoor)': [8.4875, 76.9525],
+  'Ward 5 (Palayam)': [8.5005, 76.9536],
+  'Ward 6 (Karamana)': [8.4700, 76.9700],
+  'Ward 7 (Nemom)': [8.4500, 76.9600],
+  'Ward 8 (Kovalam)': [8.3988, 76.9820],
+}
+
+function findNearestWard(lat, lng) {
+  let nearest = WARDS[0]
+  let minDist = Infinity
+  for (const [name, coords] of Object.entries(WARD_COORDS)) {
+    const d = Math.sqrt((lat - coords[0]) ** 2 + (lng - coords[1]) ** 2)
+    if (d < minDist) {
+      minDist = d
+      nearest = name
+    }
+  }
+  return nearest
+}
+
 const LANGUAGES = ['English', 'Malayalam', 'Hindi']
 
 export default function CitizenPortal() {
@@ -36,6 +60,29 @@ export default function CitizenPortal() {
   const [toast, setToast] = useState(null)
   const [receipt, setReceipt] = useState(null)
   const [listening, setListening] = useState(false)
+  const [locating, setLocating] = useState(false)
+
+  const handleGeolocate = useCallback(() => {
+    if (!navigator.geolocation) {
+      setToast({ message: 'Geolocation not supported by your browser', type: 'error' })
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const nearest = findNearestWard(pos.coords.latitude, pos.coords.longitude)
+        setWard(nearest)
+        setToast({ message: `Detected: ${nearest}`, type: 'success' })
+        setLocating(false)
+      },
+      (err) => {
+        console.error('Geolocation error:', err)
+        setToast({ message: 'Could not detect location. Please select ward manually.', type: 'error' })
+        setLocating(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }, [])
 
   // Check speech recognition support
   const SpeechRecognition =
@@ -260,18 +307,33 @@ export default function CitizenPortal() {
           <label className="mb-1 block text-sm font-medium text-gray-700 font-body">
             Ward <span className="text-critical">*</span>
           </label>
-          <select
-            value={ward}
-            onChange={(e) => setWard(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-body text-gray-900 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
-            required
-            disabled={loading}
-          >
-            <option value="">Select your ward</option>
-            {WARDS.map((w) => (
-              <option key={w} value={w}>{w}</option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={ward}
+              onChange={(e) => setWard(e.target.value)}
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-body text-gray-900 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+              required
+              disabled={loading}
+            >
+              <option value="">Select your ward</option>
+              {WARDS.map((w) => (
+                <option key={w} value={w}>{w}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleGeolocate}
+              disabled={loading || locating}
+              className="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50"
+              title="Use my location"
+            >
+              <svg className={`h-4 w-4 ${locating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              {locating ? 'Detecting...' : 'Locate'}
+            </button>
+          </div>
         </div>
 
         {/* Description */}

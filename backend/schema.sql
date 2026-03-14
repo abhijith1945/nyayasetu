@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS grievances (
     cluster_id UUID REFERENCES clusters(id),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     resolved_at TIMESTAMPTZ,
-    resolution_confirmed BOOLEAN DEFAULT FALSE
+    resolution_confirmed BOOLEAN DEFAULT FALSE,
+    support_count INTEGER DEFAULT 0
 );
 
 -- Actions table

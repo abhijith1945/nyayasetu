@@ -145,3 +145,41 @@ async def get_brief():
     except Exception as e:
         logger.error("Dashboard brief error: %s", str(e))
         return {"success": False, "data": None, "error": str(e)}
+
+
+@router.get("/trends")
+async def get_trends():
+    """Get complaint trends: by-category counts and status breakdown."""
+    from main import supabase
+    if not supabase:
+        return {"success": False, "data": None, "error": "Database not configured"}
+    try:
+        result = supabase.table("grievances").select("category, status, urgency, ward").execute()
+        grievances = result.data or []
+
+        cat_counts = {}
+        for g in grievances:
+            cat = g.get("category") or "other"
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+        by_category = [{"name": k, "count": v} for k, v in sorted(cat_counts.items(), key=lambda x: -x[1])]
+
+        status_counts = {}
+        for g in grievances:
+            s = g.get("status") or "open"
+            status_counts[s] = status_counts.get(s, 0) + 1
+        by_status = [{"name": k, "count": v} for k, v in status_counts.items()]
+
+        ward_counts = {}
+        for g in grievances:
+            w = g.get("ward") or "Unknown"
+            ward_counts[w] = ward_counts.get(w, 0) + 1
+        by_ward = [{"name": k, "count": v} for k, v in sorted(ward_counts.items(), key=lambda x: -x[1])]
+
+        return {
+            "success": True,
+            "data": {"by_category": by_category, "by_status": by_status, "by_ward": by_ward},
+            "error": None,
+        }
+    except Exception as e:
+        logger.error("Dashboard trends error: %s", str(e))
+        return {"success": False, "data": None, "error": str(e)}

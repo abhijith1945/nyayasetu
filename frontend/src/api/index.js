@@ -52,6 +52,8 @@ export const getDashboardMap = () => api.get("/api/dashboard/map");
 
 export const generateBrief = () => api.get("/api/dashboard/brief");
 
+export const getDashboardTrends = () => api.get("/api/dashboard/trends");
+
 /* ────────── Legal / Justice-Link endpoints ────────── */
 
 export const getLegalCases = () => api.get("/api/legal");
@@ -63,5 +65,9 @@ export const checkEligibility = (id) => api.get(`/api/legal/check/${id}`);
 /* ────────── Translation endpoint ────────── */
 
 export const translateGrievance = (id) => api.get(`/api/translate/${id}`);
+
+/* ────────── Community endpoint ────────── */
+
+export const supportGrievance = (id) => api.post(`/api/grievances/${id}/support`);
 
 export default api;
