@@ -65,38 +65,55 @@ def extract_name(text: str) -> Optional[str]:
     if not text:
         return None
     
-    # Pattern 1: "I am Rajesh Kumar"
-    match = re.search(r'\bi\s+am\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', text, re.IGNORECASE)
+    # Normalize: capitalize first letter of words for matching
+    normalized = ' '.join(word.capitalize() for word in text.split())
+    
+    # Pattern 1: "I am Rajesh Kumar" (case-insensitive)
+    match = re.search(r'\bi\s+am\s+([a-z]+(?:\s+[a-z]+)?)\b', text, re.IGNORECASE)
     if match:
-        name = match.group(1).strip()
-        if len(name.split()) <= 3:
+        name = match.group(1).strip().title()
+        if len(name.split()) <= 3 and len(name) > 2:
             return name
     
     # Pattern 2: "My name is Rajesh Kumar"
-    match = re.search(r'my\s+name\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', text, re.IGNORECASE)
+    match = re.search(r'my\s+name\s+is\s+([a-z]+(?:\s+[a-z]+)?)\b', text, re.IGNORECASE)
     if match:
-        name = match.group(1).strip()
-        if len(name.split()) <= 3:
+        name = match.group(1).strip().title()
+        if len(name.split()) <= 3 and len(name) > 2:
             return name
     
     # Pattern 3: "This is Rajesh Kumar speaking"
-    match = re.search(r'this\s+is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:speaking|calling)', text, re.IGNORECASE)
+    match = re.search(r'this\s+is\s+([a-z]+(?:\s+[a-z]+)?)\s+(?:speaking|calling)', text, re.IGNORECASE)
     if match:
-        name = match.group(1).strip()
-        if len(name.split()) <= 3:
+        name = match.group(1).strip().title()
+        if len(name.split()) <= 3 and len(name) > 2:
             return name
     
     # Pattern 4: "Rajesh Kumar speaking" or "Rajesh Kumar calling"
-    match = re.search(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:speaking|calling|here)\b', text, re.IGNORECASE)
+    match = re.search(r'\b([a-z]+(?:\s+[a-z]+)?)\s+(?:speaking|calling|here)\b', text, re.IGNORECASE)
     if match:
-        name = match.group(1).strip()
-        if len(name.split()) <= 3:
+        name = match.group(1).strip().title()
+        if len(name.split()) <= 3 and len(name) > 2:
             return name
     
     # Pattern 5: "Name: Rajesh Kumar"
-    match = re.search(r'name\s*:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)', text, re.IGNORECASE)
+    match = re.search(r'name\s*:\s*([a-z]+(?:\s+[a-z]+)?)', text, re.IGNORECASE)
     if match:
-        name = match.group(1).strip()
+        name = match.group(1).strip().title()
+        if len(name.split()) <= 3 and len(name) > 2:
+            return name
+    
+    # Pattern 6: Single word name at start of sentence (e.g., "Raj called about...")
+    match = re.match(r'^([a-z]+)\s+(?:called|calling|speaking|said|reported)', text, re.IGNORECASE)
+    if match:
+        name = match.group(1).strip().title()
+        if len(name) > 2 and len(name) < 20:
+            return name
+    
+    # Pattern 7: Comma-separated names (e.g., "Kumar, Rajesh")
+    match = re.search(r'\b([a-z]+)\s*,\s*([a-z]+)\b', text, re.IGNORECASE)
+    if match:
+        name = f"{match.group(2).title()} {match.group(1).title()}"
         if len(name.split()) <= 3:
             return name
     

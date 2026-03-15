@@ -76,17 +76,26 @@ def predict_resolution_time(grievance: dict, historical_data: List[dict] = None)
     category = features["category_encode"]
     base_hours = baseline_resolution_times.get(category, 84)
     
-    # Adjust based on urgency (high urgency = faster resolution expected)
-    urgency_multiplier = 0.5 if features["urgency"] >= 4 else (1.2 if features["urgency"] <= 2 else 1.0)
+    # Adjust based on urgency (5 = highest urgency, 1 = lowest)
+    # High urgency reduces time by up to 20%, low urgency increases by 10%
+    urgency_score = (features["urgency"] - 3) / 5  # Normalize to -0.4 to +0.4
+    urgency_multiplier = 1.0 - (urgency_score * 0.25)  # Range: 0.9 to 1.1
     
-    # Adjust based on credibility (high credibility = faster)
-    credibility_multiplier = 0.8 if features["credibility_score"] >= 70 else (1.3 if features["credibility_score"] <= 30 else 1.0)
+    # Adjust based on credibility (high credibility = slightly faster)
+    # Score 0-100: low (0-30) increases by 15%, medium (30-70) no change, high (70-100) reduces by 10%
+    credibility_normalized = (features["credibility_score"] - 50) / 100  # Normalize to -0.5 to +0.5
+    credibility_multiplier = 1.0 - (credibility_normalized * 0.15)  # Range: 0.925 to 1.075
     
-    # Adjust based on evidence (image verified = faster)
-    evidence_multiplier = 0.7 if features["is_image_verified"] else 1.0
+    # Adjust based on evidence (image verified = 5% faster)
+    evidence_multiplier = 0.95 if features["is_image_verified"] else 1.0
     
-    # Calculate predicted hours
-    predicted_hours = base_hours * urgency_multiplier * credibility_multiplier * evidence_multiplier
+    # Calculate predicted hours with bounded multiplications to avoid extreme values
+    # Instead of multiplying all multipliers, use additive approach for non-extreme adjustments
+    total_adjustment = (urgency_multiplier - 1.0) + (credibility_multiplier - 1.0) + (evidence_multiplier - 1.0)
+    predicted_hours = base_hours * (1.0 + total_adjustment)
+    
+    # Apply realistic bounds: don't go lower than 25% of baseline or higher than 175% of baseline
+    predicted_hours = max(base_hours * 0.25, min(base_hours * 1.75, predicted_hours))
     
     # Calculate confidence based on how much data we have
     confidence = 0.65  # Base confidence
@@ -100,9 +109,9 @@ def predict_resolution_time(grievance: dict, historical_data: List[dict] = None)
         "category": grievance.get("category", "other"),
         "factors": {
             "base_hours": base_hours,
-            "urgency_impact": urgency_multiplier,
-            "credibility_impact": credibility_multiplier,
-            "evidence_impact": evidence_multiplier,
+            "urgency_impact": round(urgency_multiplier, 3),
+            "credibility_impact": round(credibility_multiplier, 3),
+            "evidence_impact": round(evidence_multiplier, 3),
         }
     }
 

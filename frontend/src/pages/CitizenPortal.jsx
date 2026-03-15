@@ -184,34 +184,29 @@ export default function CitizenPortal() {
       setToast({ message: `Audio error: ${result.error}`, type: 'error' })
     } else if (result.text) {
       setDescription(prev => prev + (prev ? ' ' : '') + result.text)
-      setToast({ message: 'Speech converted to text!', type: 'success' })
+      setToast({ message: '✅ Speech converted to text!', type: 'success' })
       
-      // Try to extract identity from audio transcript
+      // Auto-extract name and phone from audio transcript
       extractIdentity(result.text)
         .then((res) => {
           const extracted = res?.data?.data || {}
-          const method = res?.data?.method || 'unknown'
           
-          if (extracted.name) {
-            setName(prev => prev || extracted.name)
+          if (extracted.name && !name) {
+            setName(extracted.name)
             setToast({ 
-              message: `Name auto-filled: ${extracted.name}`, 
+              message: `✅ Name auto-filled: ${extracted.name}`, 
               type: 'success' 
             })
           }
           
-          if (extracted.phone) {
-            setPhone(prev => prev || extracted.phone)
+          if (extracted.phone && !phone) {
+            setPhone(extracted.phone)
             if (!extracted.name) {
               setToast({ 
-                message: `Phone auto-filled: ${extracted.phone}`, 
+                message: `✅ Phone auto-filled: ${extracted.phone}`, 
                 type: 'success' 
               })
             }
-          }
-          
-          if (!extracted.name && !extracted.phone) {
-            console.log(`No name/phone found (method: ${method})`)
           }
         })
         .catch((err) => {
@@ -219,7 +214,7 @@ export default function CitizenPortal() {
           // Silent fail - user can fill manually
         })
     }
-  }, [])
+  }, [name, phone])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -326,7 +321,7 @@ export default function CitizenPortal() {
         {/* Browser voice recognition (Web Speech API) */}
         <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 p-4">
           <p className="mb-4 text-sm font-medium text-gray-700 font-body">
-            Browser Voice Input
+            🌐 Browser Voice Input
           </p>
           <button
             onClick={listening ? stopListening : startListening}
@@ -344,7 +339,7 @@ export default function CitizenPortal() {
             </svg>
           </button>
           <p className={`mt-2 text-xs font-body ${listening ? 'text-critical font-semibold animate-pulse' : 'text-gray-500'}`}>
-            {listening ? 'Listening...' : 'Tap to speak'}
+            {listening ? '🔴 Listening...' : 'Tap to speak'}
           </p>
           {!SpeechRecognition && (
             <p className="mt-1 text-xs text-orange-500 font-body">
@@ -353,14 +348,18 @@ export default function CitizenPortal() {
           )}
         </div>
 
-        {/* Whisper API recording */}
+        {/* Advanced AI audio recording */}
         <div className="flex flex-col items-center rounded-lg border-2 border-gray-200 bg-gray-50 p-4">
           <p className="mb-4 text-sm font-medium text-gray-700 font-body">
-            AI Voice Recognition
+            🎙️ AI Voice Recognition
           </p>
-          <AudioRecorder onTranscribed={handleAudioTranscribed} disabled={loading} />
+          <AudioRecorder 
+            onTranscribed={handleAudioTranscribed} 
+            disabled={loading}
+            language={language}
+          />
           <p className="mt-2 text-xs text-gray-500 font-body text-center">
-            Uses AI for better accuracy
+            Smart speech-to-text
             <br />
             Max 5 minutes
           </p>
