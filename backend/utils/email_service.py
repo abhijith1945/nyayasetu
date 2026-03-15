@@ -214,3 +214,59 @@ async def send_dataset_issue_notification(
     except Exception as e:
         logger.error(f"Failed to send dataset notification: {e}")
         return False
+
+
+def send_email_smtp(
+    to_email: str,
+    subject: str,
+    html_content: str,
+    plain_text: Optional[str] = None
+) -> bool:
+    """
+    Generic email sender via SMTP (synchronous)
+    
+    Args:
+        to_email: Recipient email address
+        subject: Email subject line
+        html_content: HTML formatted email body
+        plain_text: Optional plain text alternative
+    
+    Returns:
+        bool: True if sent successfully
+    """
+    try:
+        if not GMAIL_SENDER or not GMAIL_PASSWORD:
+            logger.warning("Gmail credentials not configured - skipping email send")
+            return False
+        
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = GMAIL_SENDER
+        msg["To"] = to_email
+        
+        # Attach plain text part if provided, otherwise use simplified HTML
+        if plain_text:
+            msg.attach(MIMEText(plain_text, "plain"))
+        
+        # Attach HTML part
+        msg.attach(MIMEText(html_content, "html"))
+        
+        # Send via SMTP
+        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        server.starttls()
+        server.login(GMAIL_SENDER, GMAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        
+        logger.info(f"✅ Email sent to {to_email} with subject: {subject}")
+        return True
+        
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"Gmail authentication failed: {e}")
+        return False
+    except smtplib.SMTPException as e:
+        logger.error(f"SMTP error: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to send email: {e}")
+        return False

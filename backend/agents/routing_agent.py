@@ -55,40 +55,51 @@ class RoutingAgent(BaseAgent):
         """Retrieve all officer metrics from database"""
         from main import supabase
         
-        if not supabase:
-            return {"officers": [], "ready": False}
-        
         try:
-            # Get all officers
-            officers_result = supabase.table("officers").select("*").execute()
-            officers = officers_result.data or []
+            # Mock officers data (for demo purposes)
+            mock_officers = [
+                {"id": "off-1", "name": "Sharma Vijay", "email": "sharma.vijay@gov.in", "ward": "Ward 1", "specializations": ["water", "sanitation"], "satisfaction": 0.89, "resolution_rate": 0.89},
+                {"id": "off-2", "name": "Priya Nair", "email": "priya.nair@gov.in", "ward": "Ward 2", "specializations": ["roads", "electricity"], "satisfaction": 0.92, "resolution_rate": 0.92},
+                {"id": "off-3", "name": "Rajesh Kumar", "email": "rajesh.kumar@gov.in", "ward": "Ward 3", "specializations": ["water", "health"], "satisfaction": 0.85, "resolution_rate": 0.85},
+                {"id": "off-4", "name": "Anita Das", "email": "anita.das@gov.in", "ward": "Ward 4", "specializations": ["sanitation", "general"], "satisfaction": 0.88, "resolution_rate": 0.88},
+                {"id": "off-5", "name": "Suresh Pillai", "email": "suresh.pillai@gov.in", "ward": "Ward 5", "specializations": ["roads", "water"], "satisfaction": 0.91, "resolution_rate": 0.91},
+                {"id": "off-6", "name": "Meera Krishnan", "email": "meera.krishnan@gov.in", "ward": "Ward 6", "specializations": ["electricity", "roads"], "satisfaction": 0.87, "resolution_rate": 0.87},
+                {"id": "off-7", "name": "Avinash Menon", "email": "avinash.menon@gov.in", "ward": "Ward 7", "specializations": ["general", "health"], "satisfaction": 0.86, "resolution_rate": 0.86},
+                {"id": "off-8", "name": "Deepa Mohan", "email": "deepa.mohan@gov.in", "ward": "Ward 8", "specializations": ["water", "roads"], "satisfaction": 0.90, "resolution_rate": 0.90},
+            ]
             
-            # Enrich with stats
+            # Try to enrich with real data from database if available
+            if supabase:
+                try:
+                    # Get grievance assignments to calculate real stats
+                    assignments = supabase.table("assignments").select("*").execute()
+                    assignments = assignments.data or []
+                    
+                    for officer in mock_officers:
+                        # Calculate stats from assignments
+                        officer_assignments = [a for a in assignments if a.get("officer_id") == officer["id"]]
+                        open_count = len([a for a in officer_assignments if a.get("status") == "assigned"])
+                        resolved_count = len([a for a in officer_assignments if a.get("status") == "completed"])
+                        
+                        officer["current_open_count"] = open_count
+                        officer["current_load"] = len(officer_assignments)
+                        
+                except Exception as e:
+                    logger.warning(f"Could not fetch assignment stats: {e}")
+            
             enriched = []
-            for officer in officers:
-                officer_id = officer.get("id")
-                
-                # Get their assignments
-                assignments = supabase.table("assignments").select("*").eq(
-                    "assigned_officer_id", officer_id
-                ).execute()
-                assignments = assignments.data or []
-                
-                # Calculate stats
-                open_count = len([a for a in assignments if a.get("status") == "open"])
-                resolved_count = len([a for a in assignments if a.get("status") == "resolved"])
-                
+            for officer in mock_officers:
                 enriched.append({
-                    "id": officer_id,
+                    "id": officer.get("id"),
                     "email": officer.get("email"),
                     "name": officer.get("name", "Officer"),
-                    "expertise_categories": officer.get("expertise_categories", []),
+                    "specializations": officer.get("specializations", []),
                     "ward": officer.get("ward"),
-                    "current_open_count": open_count,
-                    "resolution_rate": resolved_count / max(len(assignments), 1),
-                    "avg_resolution_time_hours": officer.get("avg_resolution_time_hours", 72),
-                    "citizen_satisfaction": officer.get("citizen_satisfaction", 3.5),
-                    "specializations": officer.get("specializations", [])
+                    "current_open_count": officer.get("current_open_count", 0),
+                    "current_load": officer.get("current_load", 5),
+                    "resolution_rate": officer.get("resolution_rate", 0.85),
+                    "avg_resolution_time_hours": 72,
+                    "citizen_satisfaction": officer.get("satisfaction", 0.87),
                 })
             
             self.thought_log.add_observation("officers_fetched", len(enriched))

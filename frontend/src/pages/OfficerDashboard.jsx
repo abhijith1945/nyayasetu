@@ -12,6 +12,9 @@ import {
   createBudgetEntry,
   getPredictions,
   runPredictions,
+  sendOfficerEmail,
+  exportToExcel,
+  exportToDoc,
 } from '../api'
 import StatCard from '../components/StatCard'
 import GrievanceTable from '../components/GrievanceTable'
@@ -40,6 +43,14 @@ export default function OfficerDashboard() {
   const [grievances, setGrievances] = useState([])
   const [grievancesLoading, setGrievancesLoading] = useState(false)
   const [grievancesError, setGrievancesError] = useState(null)
+
+  // Email modal state
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailForm, setEmailForm] = useState({ recipient_email: '', subject: '', message: '', grievance_id: '' })
+  const [emailLoading, setEmailLoading] = useState(false)
+
+  // Export state
+  const [exportLoading, setExportLoading] = useState(false)
 
   // Clusters tab state
   const [clusters, setClusters] = useState([])
@@ -221,6 +232,78 @@ export default function OfficerDashboard() {
     }
   }
 
+  // Handle send email
+  const handleSendEmail = async (e) => {
+    e.preventDefault()
+    setEmailLoading(true)
+    try {
+      await sendOfficerEmail({
+        recipient_email: emailForm.recipient_email,
+        subject: emailForm.subject,
+        message: emailForm.message,
+        grievance_id: emailForm.grievance_id || null,
+      })
+      setToast({ message: 'Email sent successfully!', type: 'success' })
+      setEmailForm({ recipient_email: '', subject: '', message: '', grievance_id: '' })
+      setShowEmailModal(false)
+    } catch (err) {
+      console.error('Email error:', err)
+      setToast({ message: err?.message || 'Failed to send email', type: 'error' })
+    } finally {
+      setEmailLoading(false)
+    }
+  }
+
+  // Handle export to Excel
+  const handleExportExcel = async () => {
+    setExportLoading(true)
+    try {
+      const response = await exportToExcel({})
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `grievances_export_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setToast({ message: 'Excel file downloaded', type: 'success' })
+    } catch (err) {
+      console.error('Excel export error:', err)
+      setToast({ message: err?.message || 'Failed to export to Excel', type: 'error' })
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
+  // Handle export to Doc
+  const handleExportDoc = async () => {
+    setExportLoading(true)
+    try {
+      const response = await exportToDoc({})
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `grievances_report_${new Date().toISOString().split('T')[0]}.docx`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+      setToast({ message: 'Word document downloaded', type: 'success' })
+    } catch (err) {
+      console.error('Doc export error:', err)
+      setToast({ message: err?.message || 'Failed to export to Doc', type: 'error' })
+    } finally {
+      setExportLoading(false)
+    }
+  }
+
   // Map marker color based on count
   const getMarkerColor = (count) => {
     if (count >= 16) return '#EF4444'
@@ -395,14 +478,36 @@ export default function OfficerDashboard() {
         {/* ─── COMPLAINTS TAB ─── */}
         {activeTab === 'Complaints' && (
           <div>
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h1 className="font-heading text-2xl font-bold text-navy">Complaints</h1>
-              <button
-                onClick={fetchGrievances}
-                className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium font-body text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                Refresh
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={fetchGrievances}
+                  className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium font-body text-gray-700 hover:bg-gray-200 transition-colors"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  disabled={exportLoading}
+                  className="rounded-lg bg-green-100 px-4 py-2 text-sm font-medium font-body text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                >
+                  📊 Excel
+                </button>
+                <button
+                  onClick={handleExportDoc}
+                  disabled={exportLoading}
+                  className="rounded-lg bg-blue-100 px-4 py-2 text-sm font-medium font-body text-blue-700 hover:bg-blue-200 transition-colors disabled:opacity-50"
+                >
+                  📄 Word
+                </button>
+                <button
+                  onClick={() => setShowEmailModal(true)}
+                  className="rounded-lg bg-accent/10 px-4 py-2 text-sm font-medium font-body text-accent hover:bg-accent/20 transition-colors"
+                >
+                  ✉️ Email
+                </button>
+              </div>
             </div>
 
             {grievancesError && (
@@ -414,6 +519,97 @@ export default function OfficerDashboard() {
               onResolve={handleResolve}
               loading={grievancesLoading}
             />
+
+            {/* Email Modal */}
+            {showEmailModal && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h2 className="font-heading text-lg font-bold text-navy">Send Email</h2>
+                    <button
+                      onClick={() => setShowEmailModal(false)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSendEmail} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-body">
+                        Recipient Email <span className="text-critical">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={emailForm.recipient_email}
+                        onChange={(e) => setEmailForm({ ...emailForm, recipient_email: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-body text-sm focus:border-accent focus:outline-none"
+                        placeholder="citizen@example.com"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-body">
+                        Subject <span className="text-critical">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={emailForm.subject}
+                        onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-body text-sm focus:border-accent focus:outline-none"
+                        placeholder="Grievance Status Update"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-body">
+                        Message <span className="text-critical">*</span>
+                      </label>
+                      <textarea
+                        required
+                        value={emailForm.message}
+                        onChange={(e) => setEmailForm({ ...emailForm, message: e.target.value })}
+                        rows="5"
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-body text-sm focus:border-accent focus:outline-none"
+                        placeholder="Write your message here..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 font-body">
+                        Grievance ID (optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={emailForm.grievance_id}
+                        onChange={(e) => setEmailForm({ ...emailForm, grievance_id: e.target.value })}
+                        className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-body text-sm focus:border-accent focus:outline-none"
+                        placeholder="Leave blank if not related to specific grievance"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowEmailModal(false)}
+                        className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium font-body text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={emailLoading}
+                        className="flex-1 rounded-lg bg-accent px-4 py-2 text-sm font-medium font-body text-white hover:bg-accent/90 transition-colors disabled:opacity-50"
+                      >
+                        {emailLoading ? 'Sending...' : 'Send Email'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

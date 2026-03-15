@@ -8,6 +8,7 @@ const NAV_LINKS = [
   { to: "/railway-officer", label: "Railway Officer" },
   { to: "/community", label: "Community" },
   { to: "/justice", label: "Justice-Link" },
+  { to: "/demo", label: "🎯 Live Demo" },
 ];
 
 export default function Navbar({ dark, onToggleDark }) {

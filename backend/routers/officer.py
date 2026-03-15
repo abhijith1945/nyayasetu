@@ -25,6 +25,13 @@ class StatusUpdateRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class SendEmailRequest(BaseModel):
+    recipient_email: str
+    subject: str
+    message: str
+    grievance_id: Optional[str] = None
+
+
 class AssignmentResponse(BaseModel):
     success: bool
     data: Optional[dict] = None
@@ -343,5 +350,94 @@ async def get_officer_stats(
                 "resolved": 0,
                 "pending_confirmation": 0,
             },
+            "error": str(e),
+        }
+
+
+@router.post("/send-email")
+async def send_officer_email(req: SendEmailRequest):
+    """Send email to citizen or prescribed person regarding grievance."""
+    from utils.email_service import send_email_smtp
+    
+    try:
+        # For demo: use default officer_id if no user
+        officer_id = "demo_officer"
+        recipient_email = req.recipient_email.strip()
+        subject = sanitize_string(req.subject, max_length=200)
+        message = sanitize_string(req.message, max_length=2000)
+        
+        # Validate email format (basic check)
+        if "@" not in recipient_email or "." not in recipient_email:
+            return {"success": False, "data": None, "error": "Invalid email format"}
+        
+        # Build email body
+        email_body = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <div style="max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px;">
+                    <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px;">Message from Grievance Officer</h2>
+                    
+                    <div style="margin: 20px 0;">
+                        <p><strong>Subject:</strong> {subject}</p>
+                        <hr/>
+                        <p>{message}</p>
+                    </div>
+                    
+                    {f'<p style="margin-top: 20px; font-size: 12px; color: #7f8c8d;"><strong>Grievance ID:</strong> {req.grievance_id}</p>' if req.grievance_id else ''}
+                    
+                    <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ecf0f1; font-size: 12px; color: #7f8c8d;">
+                        <p>This is an automated email from NyayaSetu - Grievance Management System</p>
+                        <p>For further assistance, please contact the grievance department.</p>
+                    </div>
+                </div>
+            </body>
+        </html>
+        """
+        
+        # Send email via SMTP
+        success = send_email_smtp(
+            to_email=recipient_email,
+            subject=subject,
+            html_content=email_body,
+        )
+        
+        if success:
+            # Log the email action
+            if req.grievance_id:
+                log_action_data = {
+                    "grievance_id": req.grievance_id,
+                    "action_type": "email_sent",
+                    "performed_by": officer_id,
+                    "notes": f"Email sent to {recipient_email} with subject: {subject}",
+                }
+                try:
+                    from main import supabase
+                    if supabase:
+                        supabase.table("actions").insert(log_action_data).execute()
+                except Exception as e:
+                    logger.warning("Failed to log email action: %s", str(e))
+            
+            logger.info(f"Email sent by officer {officer_id} to {recipient_email}")
+            return {
+                "success": True,
+                "data": {
+                    "recipient": recipient_email,
+                    "subject": subject,
+                    "sent_at": datetime.now(timezone.utc).isoformat(),
+                },
+                "error": None,
+            }
+        else:
+            logger.error(f"Failed to send email to {recipient_email}")
+            return {
+                "success": False,
+                "data": None,
+                "error": "Failed to send email. Check server logs.",
+            }
+    except Exception as e:
+        logger.error("Send email error: %s", str(e))
+        return {
+            "success": False,
+            "data": None,
             "error": str(e),
         }

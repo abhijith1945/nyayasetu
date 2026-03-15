@@ -142,4 +142,22 @@ export const getPredictions = (params) => api.get("/api/predictions", { params }
 
 export const runPredictions = () => api.post("/api/predictions/run");
 
+/* ────────── Email & Export endpoints ────────── */
+
+export const sendOfficerEmail = (data) => api.post("/api/officer/send-email", data);
+
+export const exportToExcel = (params) => {
+  return api.get("/api/export/excel", {
+    params,
+    responseType: "blob"
+  });
+};
+
+export const exportToDoc = (params) => {
+  return api.get("/api/export/doc", {
+    params,
+    responseType: "blob"
+  });
+};
+
 export default api;

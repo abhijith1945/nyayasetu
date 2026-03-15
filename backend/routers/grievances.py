@@ -1,8 +1,15 @@
 import logging
 from datetime import datetime, timezone
 from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from typing import Optional
+import io
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from docx import Document
+from docx.shared import Pt, RGBColor, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from utils.hashing import generate_hash, generate_action_hash
 from utils.whisper_client import transcribe_audio
@@ -276,3 +283,217 @@ async def transcribe_audio_endpoint(file: UploadFile = File(...), user: dict = D
             "data": None,
             "error": f"Transcription failed: {str(e)}"
         }
+
+
+@router.post("/extract-identity")
+async def extract_identity(req: dict):
+    """
+    Auto-extract citizen name and phone from complaint text using ML/AI
+    
+    Input: { "transcript": "My name is John, my number is 9876543210" }
+    Output: { "name": "John", "phone": "9876543210", "extraction_confidence": 0.95 }
+    """
+    try:
+        from utils.name_phone_extractor import auto_extract_info
+        
+        transcript = req.get("transcript", "").strip()
+        
+        if not transcript:
+            return {
+                "success": False,
+                "data": None,
+                "error": "No transcript provided"
+            }
+        
+        # Extract info using ML
+        extraction_result = auto_extract_info(transcript)
+        
+        return {
+            "success": True,
+            "data": {
+                "name": extraction_result.get("name"),
+                "phone": extraction_result.get("phone"),
+                "ward": extraction_result.get("ward"),
+                "extraction_confidence": extraction_result.get("extraction_confidence", 0.0),
+                "extraction_methods": extraction_result.get("extraction_method", []),
+                "method": "nlp_regex_extraction"
+            },
+            "error": None
+        }
+    except Exception as e:
+        logger.error("Identity extraction error: %s", str(e))
+        return {
+            "success": False,
+            "data": None,
+            "error": f"Extraction failed: {str(e)}"
+        }
+
+
+@router.get("/export/excel")
+async def export_to_excel(
+    ward: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    """Export grievances to Excel format"""
+    from main import supabase
+    
+    try:
+        logger.info("Export to Excel requested")
+        
+        if not supabase:
+            logger.error("Supabase not configured")
+            raise Exception("Database not configured")
+        
+        # Fetch grievances
+        query = supabase.table("grievances").select("*")
+        if ward:
+            query = query.eq("ward", ward)
+        if status:
+            query = query.eq("status", status)
+        
+        result = query.order("created_at", desc=True).execute()
+        grievances = result.data or []
+        logger.info(f"Fetched {len(grievances)} grievances")
+        
+        # Create workbook
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Grievances"
+        
+        headers = ["ID", "Name", "Phone", "Ward", "Category", "Status", "Urgency", "Score", "Date", "Summary"]
+        
+        # Add headers
+        for idx, h in enumerate(headers, 1):
+            ws.cell(1, idx).value = h
+        
+        # Add data
+        for row_idx, g in enumerate(grievances, 2):
+            ws.cell(row_idx, 1).value = str(g.get("id", ""))[:8]
+            ws.cell(row_idx, 2).value = str(g.get("citizen_name", ""))
+            ws.cell(row_idx, 3).value = str(g.get("phone", ""))
+            ws.cell(row_idx, 4).value = str(g.get("ward", ""))
+            ws.cell(row_idx, 5).value = str(g.get("category", ""))
+            ws.cell(row_idx, 6).value = str(g.get("status", ""))
+            ws.cell(row_idx, 7).value = g.get("urgency", 0)
+            ws.cell(row_idx, 8).value = g.get("credibility_score", 0)
+            ws.cell(row_idx, 9).value = str(g.get("created_at", ""))[:10]
+            ws.cell(row_idx, 10).value = str(g.get("ai_summary", ""))[:100]
+        
+        # Save to buffer
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        logger.info(f"Excel generated: {output.getbuffer().nbytes} bytes")
+        
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=grievances_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Excel export error: {str(e)}", exc_info=True)
+        raise
+
+
+@router.get("/export/doc")
+async def export_to_doc(
+    ward: Optional[str] = None,
+    status: Optional[str] = None,
+):
+    """Export grievances to Word document format"""
+    from main import supabase
+    
+    try:
+        logger.info("Export to Doc requested")
+        
+        if not supabase:
+            logger.error("Supabase not configured")
+            raise Exception("Database not configured")
+        
+        # Fetch grievances
+        query = supabase.table("grievances").select("*")
+        if ward:
+            query = query.eq("ward", ward)
+        if status:
+            query = query.eq("status", status)
+        
+        result = query.order("created_at", desc=True).execute()
+        grievances = result.data or []
+        logger.info(f"Fetched {len(grievances)} grievances for doc")
+        
+        # Create document
+        doc = Document()
+        doc.add_heading("Grievance Report", 0)
+        
+        # Add metadata
+        meta_p = doc.add_paragraph()
+        meta_p.add_run(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        meta_p.add_run(f"Total: {len(grievances)} grievances\n")
+        if ward:
+            meta_p.add_run(f"Ward: {ward}\n")
+        if status:
+            meta_p.add_run(f"Status: {status}\n")
+        
+        doc.add_paragraph()
+        doc.add_heading("Details", 1)
+        
+        # Add grievances
+        for idx, g in enumerate(grievances, 1):
+            try:
+                doc.add_heading(f"#{idx}: {str(g.get('id', ''))[:8]}", 2)
+                
+                # Details table
+                table = doc.add_table(rows=9, cols=2)
+                table.style = "Light Grid Accent 1"
+                
+                details = [
+                    ("ID", str(g.get("id", ""))[:16]),
+                    ("Citizen", str(g.get("citizen_name", ""))),
+                    ("Phone", str(g.get("phone", ""))),
+                    ("Ward", str(g.get("ward", ""))),
+                    ("Category", str(g.get("category", ""))),
+                    ("Status", str(g.get("status", "")).upper()),
+                    ("Urgency", f"{g.get('urgency', 0)}/5"),
+                    ("Score", f"{g.get('credibility_score', 0)}%"),
+                    ("Date", str(g.get("created_at", ""))[:10]),
+                ]
+                
+                for row_idx, (key, val) in enumerate(details):
+                    table.rows[row_idx].cells[0].text = key
+                    table.rows[row_idx].cells[1].text = val
+                
+                # Description
+                doc.add_paragraph()
+                doc.add_heading("Description", 3)
+                doc.add_paragraph(str(g.get("description", "")))
+                
+                # Summary
+                if g.get("ai_summary"):
+                    doc.add_heading("Summary", 3)
+                    doc.add_paragraph(str(g.get("ai_summary")))
+                
+                if idx < len(grievances):
+                    doc.add_page_break()
+                    
+            except Exception as e:
+                logger.warning(f"Error processing grievance {idx}: {e}")
+                continue
+        
+        # Save to buffer
+        output = io.BytesIO()
+        doc.save(output)
+        output.seek(0)
+        
+        logger.info(f"Doc generated: {output.getbuffer().nbytes} bytes")
+        
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": f"attachment; filename=grievances_{datetime.now().strftime('%Y%m%d_%H%M%S')}.docx"}
+        )
+        
+    except Exception as e:
+        logger.error(f"Doc export error: {str(e)}", exc_info=True)
+        raise

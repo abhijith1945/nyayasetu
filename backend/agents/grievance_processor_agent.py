@@ -193,7 +193,7 @@ Return JSON:
             "description": "complaint text",
             "ward": "Ward 5",
             "category": "water",
-            "phone": "9999999999",
+            "phone": "9999999999",  (auto-extracted if missing)
             "image_data": "base64_or_url"
         }
         
@@ -205,23 +205,57 @@ Return JSON:
             "recommended_actions": [...],
             "confidence": 0.85,
             "reasoning": "why this decision",
-            "reasoning_trace": {...}
+            "reasoning_trace": {...},
+            "auto_extracted": {
+                "name": "auto-detected name",
+                "phone": "auto-detected phone",
+                "ward": "auto-detected ward"
+            }
         }
         """
         
+        # ✅ AUTO-EXTRACT NAME AND PHONE FROM DESCRIPTION
+        from utils.name_phone_extractor import auto_extract_info
+        
+        description = grievance_data.get("description", "")
+        extracted_info = auto_extract_info(description)
+        
+        # Use extracted values if not provided
+        citizen_name = grievance_data.get("citizen_name") or extracted_info.get("name") or "Unknown"
+        phone = grievance_data.get("phone") or extracted_info.get("phone") or "N/A"
+        ward = grievance_data.get("ward") or extracted_info.get("ward") or "Unknown Ward"
+        
+        # Update grievance data with extracted/filled values
+        grievance_data_updated = {
+            **grievance_data,
+            "citizen_name": citizen_name,
+            "phone": phone,
+            "ward": ward,
+        }
+        
+        self.thought_log.add_observation("auto_extraction", {
+            "extracted_name": extracted_info.get("name"),
+            "extracted_phone": extracted_info.get("phone"),
+            "extraction_confidence": extracted_info.get("extraction_confidence"),
+            "methods_used": extracted_info.get("extraction_method")
+        })
+        
         problem = f"""
 Autonomously process this citizen grievance:
-- Description: {grievance_data.get('description', '')}
-- Ward: {grievance_data.get('ward', 'Unknown')}
-- Category: {grievance_data.get('category', 'other')}
-- Phone: {grievance_data.get('phone', 'N/A')}
+- Citizen Name: {citizen_name}
+- Description: {description}
+- Ward: {ward}
+- Category: {grievance_data_updated.get('category', 'other')}
+- Phone: {phone}
+- Contact Info Confidence: {extracted_info.get('extraction_confidence', 0)}
 
 Decide: Should we accept/escalate/reject this? What actions?
 """
         
         context = {
-            "grievance": grievance_data,
-            "timestamp": grievance_data.get("created_at")
+            "grievance": grievance_data_updated,
+            "timestamp": grievance_data_updated.get("created_at"),
+            "auto_extracted": extracted_info
         }
         
         # Run agent loop
@@ -229,6 +263,13 @@ Decide: Should we accept/escalate/reject this? What actions?
         
         return {
             **result,
-            "grievance_id": grievance_data.get("id"),
-            "agent_type": "GrievanceProcessor"
+            "grievance_id": grievance_data_updated.get("id"),
+            "agent_type": "GrievanceProcessor",
+            "auto_extracted": {
+                "name": extracted_info.get("name"),
+                "phone": extracted_info.get("phone"),
+                "ward": extracted_info.get("ward"),
+                "extraction_confidence": extracted_info.get("extraction_confidence"),
+                "extraction_methods": extracted_info.get("extraction_method")
+            }
         }

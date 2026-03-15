@@ -11,6 +11,7 @@ import RailwayPortal from './pages/RailwayPortal'
 import RailwayDashboard from './pages/RailwayDashboard'
 import Login from './pages/Login'
 import OfficerLogin from './pages/OfficerLogin'
+import AppDemo from './pages/AppDemo'
 
 function App() {
   const [dark, setDark] = useState(() => {
@@ -49,6 +50,7 @@ function App() {
           <Route path="/justice" element={<JusticeLinkPage />} />
           <Route path="/community" element={<CommunityFeed />} />
           <Route path="/track/:id" element={<TrackGrievance />} />
+          <Route path="/demo" element={<AppDemo />} />
         </Routes>
       </main>
     </div>
