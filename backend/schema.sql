@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL CHECK (role IN ('citizen', 'officer', 'auditor', 'admin')),
     full_name TEXT,
     phone TEXT,
-    ward TEXT REFERENCES (ward) MATCH SIMPLE ON DELETE SET NULL,
+    ward TEXT,
     sms_notifications_enabled BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),

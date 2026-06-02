@@ -381,7 +381,7 @@ export default function AppDemo() {
                 </div>
                 <div className="flex justify-between">
                   <span>Warning When:</span>
-                  <span className="text-gray-400">Risk > 70%</span>
+                  <span className="text-gray-400">Risk &gt; 70%</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Example:</span>

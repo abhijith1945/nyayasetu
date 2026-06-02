@@ -11,7 +11,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from middleware.rate_limit import add_rate_limiting
 
 # Load environment variables
-load_dotenv()
+_env_path = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path=_env_path)
 
 # Configure logging
 logging.basicConfig(

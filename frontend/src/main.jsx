@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import 'leaflet/dist/leaflet.css'
 import './index.css'
 
 // Global unhandled promise rejection handler — never crash the app
@@ -18,7 +19,7 @@ window.onerror = (message, source, lineno, colno, error) => {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <App />
     </BrowserRouter>
   </React.StrictMode>
