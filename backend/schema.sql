@@ -252,3 +252,4 @@ ALTER TABLE assignments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Allow all on users" ON users FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all on assignments" ON assignments FOR ALL USING (true) WITH CHECK (true);
+

@@ -22,8 +22,8 @@ function App() {
   useEffect(() => {
     // Demo mode: set a dummy token if not present (for testing)
     if (!localStorage.getItem('authToken')) {
-      localStorage.setItem('authToken', 'demo-token-nyayasetu-2026')
-      localStorage.setItem('user', JSON.stringify({ role: 'citizen', email: 'demo@nyayasetu.local' }))
+      localStorage.setItem('authToken', 'demo-officer-token-nyayasetu-2026')
+      localStorage.setItem('user', JSON.stringify({ role: 'officer', email: 'demo-officer@nyayasetu.local' }))
     }
   }, [])
 

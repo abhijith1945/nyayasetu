@@ -66,13 +66,32 @@ async def get_clusters():
         result = supabase.table("clusters").select("*").order("created_at", desc=True).execute()
         clusters = result.data or []
 
+        # Load all member grievances in one request to avoid a per-cluster Supabase fan-out.
+        cluster_ids = [cluster.get("id") for cluster in clusters if cluster.get("id")]
+        grievance_map = {}
+        if cluster_ids:
+            grievances_result = (
+                supabase.table("grievances")
+                .select("id, citizen_name, description, ai_summary, urgency, status, cluster_id")
+                .in_("cluster_id", cluster_ids)
+                .execute()
+            )
+            for grievance in grievances_result.data or []:
+                cluster_id = grievance.get("cluster_id")
+                grievance_map.setdefault(cluster_id, []).append({
+                    "id": grievance.get("id"),
+                    "citizen_name": grievance.get("citizen_name"),
+                    "description": grievance.get("description"),
+                    "ai_summary": grievance.get("ai_summary"),
+                    "urgency": grievance.get("urgency"),
+                    "status": grievance.get("status"),
+                })
+
         for cluster in clusters:
             member_ids = cluster.get("member_ids") or []
-            if member_ids:
-                members_result = supabase.table("grievances").select("id, citizen_name, description, ai_summary, urgency, status").in_("id", member_ids).execute()
-                cluster["members"] = members_result.data or []
-            else:
-                cluster["members"] = []
+            members = grievance_map.get(cluster.get("id"), [])
+            cluster["members"] = members[:20]
+            cluster["member_count"] = len(member_ids) if member_ids else len(members)
 
         return {"success": True, "data": clusters, "error": None}
     except Exception as e:

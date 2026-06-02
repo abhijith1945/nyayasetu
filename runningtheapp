@@ -1,0 +1,36 @@
+NyayaSetu - Run the App
+
+1. Start the backend with the correct app directory:
+   py -m uvicorn main:app --app-dir backend --reload --port 8000
+
+2. Seed a large Supabase dataset from the backend folder:
+   cd backend
+   py seed_mass_data.py
+
+3. Start the frontend from the repo root:
+   npm --prefix frontend run dev -- --host
+
+4. Open the app:
+   http://localhost:5173
+
+5. Check the live backend connection:
+   http://127.0.0.1:8000/
+
+Correct backend setup
+- Use backend/.env for the live Supabase keys.
+- The frontend should use the backend API at http://127.0.0.1:8000.
+- If you set VITE_API_URL in frontend/.env, it should point to the same backend URL.
+
+Important notes
+- Do not start the backend with the root entrypoint if it imports the wrong module path.
+- The working backend command in this repo is the one with --app-dir backend.
+- If the frontend shows demo data, it usually means the backend is down or the backend cannot reach Supabase.
+- `seed_mass_data.py` is the large dataset generator. Use `seed_data.py` only if you want the smaller demo set.
+
+Expected live data path
+Frontend -> backend API -> Supabase
+
+Quick verification
+- Backend root response should show supabase_connected: true.
+- /api/dashboard/stats should return real counts from Supabase.
+- /api/grievances should return actual grievance rows.

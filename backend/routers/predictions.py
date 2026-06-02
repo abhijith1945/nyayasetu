@@ -314,7 +314,7 @@ async def get_comprehensive_ml_report(
 
 @router.post("/run")
 async def trigger_predictions_refresh(
-    user: dict = Depends(require_roles("admin", "auditor")),
+    user: dict = Depends(require_roles("officer", "admin", "auditor")),
 ):
     """Manually trigger predictions refresh (normally runs on background schedule)."""
     from main import supabase

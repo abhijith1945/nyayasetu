@@ -78,6 +78,13 @@ async def get_current_user(credentials = Depends(security)) -> Dict[str, Any]:
     token = credentials.credentials
     
     # Demo mode: accept demo tokens
+    if token.startswith('demo-officer-token-'):
+        return {
+            'user_id': 'demo-officer-user',
+            'role': 'officer',
+            'email': 'demo-officer@nyayasetu.local'
+        }
+
     if token.startswith('demo-token-'):
         return {
             'user_id': 'demo-user',
